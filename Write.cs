@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Diagnostics;
 using System.IO;
 using System.Text;
@@ -14,6 +14,7 @@ public class Write : MonoBehaviour
     private static bool _LogDisplay;
     private static bool _WarningDisplay;
     private static bool _LogData;
+    private static bool IsIDE;
     private FileInfo fileInfo;
     private string NowTime;
 
@@ -34,20 +35,25 @@ public class Write : MonoBehaviour
     public void LogStart(bool WarningDisplay = false, bool LogDisplay = false, bool AllDisplay = false,
         bool LogData = true)
     {
-        if (FileWriter == null)
+
+        if ((FileWriter == null))
         {
+            IsIDE = Application.isEditor; //获取当前场景运行环境
             _WarningDisplay = WarningDisplay;
             _LogDisplay = LogDisplay;
             _AllDisplay = AllDisplay;
             _LogData = LogData;
-            Directory.CreateDirectory(Application.dataPath + "/StreamingAssets");
-            Directory.CreateDirectory(Application.dataPath + "/StreamingAssets/" + "Log");
-            NowTime = DateTime.Now.ToString().Replace(" ", "_").Replace("/", "_").Replace(":", "_");
-            fileInfo = new FileInfo(Application.dataPath + "/StreamingAssets/Log/" + NowTime + "_Log.txt");
+            if (IsIDE == false) //判断当前场景运行环境，如果是Editor中则不执行
+            {
+                Directory.CreateDirectory(Application.dataPath + "/StreamingAssets");
+                Directory.CreateDirectory(Application.dataPath + "/StreamingAssets/" + "Log");
+                NowTime = DateTime.Now.ToString().Replace(" ", "_").Replace("/", "_").Replace(":", "_");
+                fileInfo = new FileInfo(Application.dataPath + "/StreamingAssets/Log/" + NowTime + "_Log.txt");
                 //设置Log文件输出地址
-            FileWriter = fileInfo.Open(FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.Read);
-            encoding = new UTF8Encoding();
-            Application.logMessageReceived += LogCallback;
+                FileWriter = fileInfo.Open(FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.Read);
+                encoding = new UTF8Encoding();
+                Application.logMessageReceived += LogCallback;
+            }
         }
     }
 
@@ -58,16 +64,27 @@ public class Write : MonoBehaviour
     /// <param name="con"></param>
     public static void Log(object _log)
     {
-        if ((FileWriter != null) && (_LogDisplay == false) && (_AllDisplay == false))
+        if ((_LogDisplay == false) && (_AllDisplay == false))
         {
-            var trace = new StackTrace(); //获取调用类信息
-            var ClassName = trace.GetFrame(1).GetMethod().DeclaringType.Name;
-            var WayName = trace.GetFrame(1).GetMethod().Name;
             if (_LogData)
                 Debug.Log(_log);
-            var log = DateTime.Now + " " + "[" + ClassName + "." + WayName + "]" + " " + ":" + " " + _log +
-                      Environment.NewLine;
-            FileWriter.Write(encoding.GetBytes(log), 0, encoding.GetByteCount(log));
+            if (IsIDE == false)
+            {
+                try
+                {
+                    var trace = new StackTrace(); //获取调用类信息
+                    var ClassName = trace.GetFrame(1).GetMethod().DeclaringType.Name;
+                    var WayName = trace.GetFrame(1).GetMethod().Name;
+                    var log = DateTime.Now + " " + "[" + ClassName + "." + WayName + "]" + " " + ":" + " " + _log +
+                              Environment.NewLine;
+                    FileWriter.Write(encoding.GetBytes(log), 0, encoding.GetByteCount(log));
+                }
+                catch (Exception)
+                {
+                    Debug.Log("请检测是否调用了Console.LogStart方法,或者关闭控制台Log写入与所有数据写入项");
+                }
+
+            }
         }
         else
         {
@@ -122,7 +139,7 @@ public class Write : MonoBehaviour
 
     private void OnDestroy() //关闭写入
     {
-        if (FileWriter != null)
+        if ((FileWriter != null) && (IsIDE == false))
         {
             FileWriter.Close();
             Application.RegisterLogCallback(null);
